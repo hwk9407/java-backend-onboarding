@@ -24,7 +24,7 @@ public class User {
     @Column(nullable = false)
     private String nickname;
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @Enumerated(EnumType.STRING)
     private Set<Authority> authorityName;
 
