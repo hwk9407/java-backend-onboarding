@@ -1,9 +1,12 @@
 package com.example.javabackendonboarding.security.filter;
 
 import com.example.javabackendonboarding.api.auth.dto.request.LoginRequest;
+import com.example.javabackendonboarding.api.auth.dto.response.LoginResponse;
 import com.example.javabackendonboarding.domain.user.entity.User;
 import com.example.javabackendonboarding.security.config.JwtUtil;
+import com.example.javabackendonboarding.security.dto.CreateRefreshTokenRequest;
 import com.example.javabackendonboarding.security.entity.UserDetailsImpl;
+import com.example.javabackendonboarding.security.service.JwtTokenService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,9 +22,11 @@ import java.io.IOException;
 @Slf4j(topic = "로그인 및 JWT 생성")
 public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilter {
     private final JwtUtil jwtUtil;
+    private final JwtTokenService jwtTokenService;
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil) {
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, JwtTokenService jwtTokenService) {
         this.jwtUtil = jwtUtil;
+        this.jwtTokenService = jwtTokenService;
         setFilterProcessesUrl("/sign");
     }
 
@@ -43,12 +48,28 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
     }
 
     @Override
-    protected void successfulAuthentication(HttpServletRequest request, HttpServletResponse response, FilterChain chain, Authentication authResult) {
+    protected void successfulAuthentication(HttpServletRequest request, HttpServletResponse response, FilterChain chain, Authentication authResult) throws IOException {
         UserDetailsImpl userDetails = (UserDetailsImpl) authResult.getPrincipal();
         User user = userDetails.getUser();
 
         String token = jwtUtil.generateAccessToken(user);
-        response.addHeader(jwtUtil.getAccessHeader(), token);
+        jwtUtil.addAccessTokenToHeader(response, token);
+
+        String refreshToken = jwtUtil.generateRefreshToken(user);
+        CreateRefreshTokenRequest reqDto = new CreateRefreshTokenRequest(
+                refreshToken,
+                user,
+                jwtUtil.getRefreshTokenExpirationTime(refreshToken)
+        );
+        jwtUtil.addRefreshTokenToCookie(response, refreshToken);
+        jwtTokenService.createRefreshToken(reqDto);
+
+        LoginResponse loginResDto = new LoginResponse(token.substring("Bearer ".length()));
+        ObjectMapper objectMapper = new ObjectMapper();
+        String jsonResponse = objectMapper.writeValueAsString(loginResDto);
+
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write(jsonResponse);
     }
 
     @Override
