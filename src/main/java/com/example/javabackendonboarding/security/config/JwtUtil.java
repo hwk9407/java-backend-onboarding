@@ -25,8 +25,8 @@ import java.util.Map;
 @Getter
 public class JwtUtil {
 
-    private static final int EXPIRE_TOKEN_TIME = 1;
-    private static final int EXPIRE_REFRESH_TOKEN_TIME = 5;
+    private static final int EXPIRE_TOKEN_TIME = 30;
+    private static final int EXPIRE_REFRESH_TOKEN_TIME = 60 * 24;
     private Key accessKey;
     private Key refreshKey;
 
