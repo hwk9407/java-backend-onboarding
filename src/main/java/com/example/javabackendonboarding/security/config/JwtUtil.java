@@ -5,6 +5,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +13,10 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.security.Key;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Map;
@@ -20,8 +25,10 @@ import java.util.Map;
 @Getter
 public class JwtUtil {
 
-    private static final long EXPIRE_TOKEN_TIME = 60 * 60 * 1000L; // 60분
-    private Key key;
+    private static final int EXPIRE_TOKEN_TIME = 1;
+    private static final int EXPIRE_REFRESH_TOKEN_TIME = 5;
+    private Key accessKey;
+    private Key refreshKey;
 
     @Value("${jwt.header}")
     private String accessHeader;
@@ -29,12 +36,16 @@ public class JwtUtil {
     @Value("${jwt.secret-key}")
     private String secretKey;
 
-
+    @Value("${jwt.refresh-secret-key}")
+    private String refreshSecretKey;
 
     @PostConstruct
     public void init() {
         byte[] bytes = Base64.getDecoder().decode(secretKey);
-        key = Keys.hmacShaKeyFor(bytes);
+        accessKey = Keys.hmacShaKeyFor(bytes);
+
+        bytes = Base64.getDecoder().decode(refreshSecretKey);
+        refreshKey = Keys.hmacShaKeyFor(bytes);
     }
 
     public String generateAccessToken(User user) {
@@ -45,31 +56,54 @@ public class JwtUtil {
                         "nickname", user.getNickname(),
                         "roles", user.getAuthorityName()
                 ))
-                .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + EXPIRE_TOKEN_TIME))
-                .signWith(key)
+                .issuedAt(Date.from(Instant.now()))
+                .expiration(Date.from(Instant.now().plus(EXPIRE_TOKEN_TIME, ChronoUnit.MINUTES)))
+                .signWith(accessKey)
                 .compact();
     }
 
     public void addAccessTokenToHeader(HttpServletResponse response, String accessToken) {
-        response.addHeader(accessHeader, "Bearer " + accessToken);
+        response.addHeader(accessHeader, accessToken);
     }
 
-    public Claims validate(String accessToken) {
+    public String generateRefreshToken(User user) {
+        return Jwts.builder()
+                .subject(user.getId().toString())
+                .issuedAt(Date.from(Instant.now()))
+                .expiration(Date.from(Instant.now().plus(EXPIRE_REFRESH_TOKEN_TIME, ChronoUnit.MINUTES)))
+                .signWith(refreshKey)
+                .compact();
+    }
+
+
+    public void addRefreshTokenToCookie(HttpServletResponse response, String refreshToken) {
+        Cookie refreshTokenCookie = new Cookie("refresh_token", refreshToken);
+        refreshTokenCookie.setPath("/");
+        refreshTokenCookie.setHttpOnly(true);
+        // refreshTokenCookie.setSecure(true);
+        refreshTokenCookie.setMaxAge(EXPIRE_TOKEN_TIME);
+
+        response.addCookie(refreshTokenCookie);
+    }
+
+    public Claims validateAccessToken(String token) {
         return Jwts.parser()
-                .verifyWith((SecretKey) key)
+                .verifyWith((SecretKey) accessKey)
                 .build()
-                .parseSignedClaims(accessToken)
+                .parseSignedClaims(token)
                 .getPayload();
     }
 
-    public Long extractUserId(String accessToken) {
-        String subject = Jwts.parser()
-                .verifyWith((SecretKey) key)
+    public Claims validateRefreshToken(String token) {
+        return Jwts.parser()
+                .verifyWith((SecretKey) refreshKey)
                 .build()
-                .parseSignedClaims(accessToken)
-                .getPayload()
-                .getSubject();
-        return Long.valueOf(subject);
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
+    public LocalDateTime getRefreshTokenExpirationTime(String refreshToken) {
+        Date date = validateRefreshToken(refreshToken).getExpiration();
+        return date.toInstant().atZone(ZoneId.of("Asia/Seoul")).toLocalDateTime();
     }
 }

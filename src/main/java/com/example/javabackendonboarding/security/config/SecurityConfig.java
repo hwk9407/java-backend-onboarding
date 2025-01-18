@@ -2,6 +2,7 @@ package com.example.javabackendonboarding.security.config;
 
 import com.example.javabackendonboarding.security.filter.JwtAuthenticationFilter;
 import com.example.javabackendonboarding.security.filter.JwtAuthorizationFilter;
+import com.example.javabackendonboarding.security.service.JwtTokenService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -23,6 +24,7 @@ public class SecurityConfig {
 
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
+    private final JwtTokenService jwtTokenService;
     private final AuthenticationConfiguration authenticationConfiguration;
 
     @Bean
@@ -32,14 +34,14 @@ public class SecurityConfig {
 
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() throws Exception {
-        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil, jwtTokenService);
         filter.setAuthenticationManager(authenticationManager(authenticationConfiguration));
         return filter;
     }
 
     @Bean
     public JwtAuthorizationFilter jwtAuthorizationFilter() {
-        return new JwtAuthorizationFilter(jwtUtil, userDetailsService);
+        return new JwtAuthorizationFilter(jwtUtil, userDetailsService, jwtTokenService);
     }
 
     @Bean
