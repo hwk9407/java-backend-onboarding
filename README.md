@@ -115,9 +115,9 @@
 
 ---
 
-## AWS에 배포하기
-- EC2 배포 IP: 3.39.25.199 (Elastic IP 설정을 안해서 변경될 수 있음)
-- [Swagger UI](http://3.39.25.199:8080/swagger-ui/index.html)
+## AWS에 배포하기(25.01.22 16:00에 비용 이슈로 서비스 종료)
+- EC2 배포 IP: ~~3.39.25.199~~ (Elastic IP 설정을 안해서 변경될 수 있음)
+- [~~Swagger UI~~](http://3.39.25.199:8080/swagger-ui/index.html)
 
 ---
 
